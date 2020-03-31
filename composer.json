@@ -1,14 +1,14 @@
 {
-    "name": "metaregistrar/twnic-epp-client",
+    "name": "delta935142/twnic-epp-client",
     "type": "library",
     "description": "Object-oriented PHP EPP Client",
     "keywords": ["xml","epp","domains","twnic"],
-    "homepage": "https://github.com/Delta935142/twnic-epp-client",
+    "homepage": "https://github.com/metaregistrar/php-epp-client",
     "license": "MIT",
     "authors": [
         {
-            "name": "ShuHan Lin",
-            "email": "s303446@gmail.com"
+            "name": "Ewout de Graaf",
+            "email": "ewout@metaregistrar.com"
         }
     ],
     "require": {
