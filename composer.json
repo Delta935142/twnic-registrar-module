@@ -1,0 +1,23 @@
+{
+    "name": "delta935142/twnic-epp-client",
+    "type": "library",
+    "description": "Object-oriented PHP EPP Client",
+    "keywords": ["xml","epp","domains","twnic"],
+    "homepage": "https://github.com/Delta935142/twnic-epp-client.git",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "ShuHan Lin",
+            "email": "s303446@gmail.com"
+        }
+    ],
+    "require": {
+        "php": "^7"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^7"
+    },
+    "autoload": {
+        "classmap" : [ "Protocols/", "Registries/" ]
+    }
+}
