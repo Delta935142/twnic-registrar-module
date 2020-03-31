@@ -1,5 +1,5 @@
 {
-    "name": "delta935142/twnic-epp-client",
+    "name": "metaregistrar/twnic-epp-client",
     "type": "library",
     "description": "Object-oriented PHP EPP Client",
     "keywords": ["xml","epp","domains","twnic"],
