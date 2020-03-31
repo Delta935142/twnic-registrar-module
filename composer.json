@@ -3,7 +3,7 @@
     "type": "library",
     "description": "Object-oriented PHP EPP Client",
     "keywords": ["xml","epp","domains","twnic"],
-    "homepage": "https://github.com/Delta935142/twnic-epp-client.git",
+    "homepage": "https://github.com/Delta935142/twnic-epp-client",
     "license": "MIT",
     "authors": [
         {
