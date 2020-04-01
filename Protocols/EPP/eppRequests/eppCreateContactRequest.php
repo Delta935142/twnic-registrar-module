@@ -184,21 +184,5 @@ class eppCreateContactRequest extends eppContactRequest {
             $this->addSessionId();
         }
     }
-
-    /**
-     * 更新資料插入AppID & CmpID
-     *
-     * @param [type] $updateInfo
-     * @return void
-     */
-    public function setUpdateInfo($updateInfo)
-    {
-        if (property_exists($updateInfo, 'appID') || property_exists($updateInfo, 'cmpID')) {
-            $extension = $this->createElement('extension');
-            if (property_exists($updateInfo, 'appID')) $extension->appendChild($this->createElement('AppID:update', $updateInfo->appID));
-            if (property_exists($updateInfo, 'cmpID')) $extension->appendChild($this->createElement('CmpID:update', $updateInfo->cmpID));
-            $this->contactobject->appendChild($extension);
-        }
-    }
 }
 
