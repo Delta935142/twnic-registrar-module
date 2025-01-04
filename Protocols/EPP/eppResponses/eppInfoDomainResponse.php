@@ -18,6 +18,9 @@ class eppInfoDomainResponse extends eppInfoResponse {
         $nameservers = $this->getDomainNameservers();
         $authinfo = $this->getDomainAuthInfo();
         $domain = new eppDomain($domainname, $registrant, $contacts, $nameservers, 1, $authinfo);
+        foreach ($this->getDomainStatuses() as $status) {
+            $domain->addStatus($status);
+        }
         return $domain;
     }
 
@@ -156,7 +159,6 @@ class eppInfoDomainResponse extends eppInfoResponse {
      * @return string expiration_date
      */
     public function getDomainExpirationDate() {
-        date_default_timezone_set("UTC");
         return $this->queryPath('/epp:epp/epp:response/epp:resData/domain:infData/domain:exDate');
     }
 

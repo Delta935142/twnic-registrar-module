@@ -79,7 +79,7 @@ class eppResponse extends \DOMDocument {
     /*
      * @var array of supported versions
      */
-    public $version;
+    public $versions;
 
     public $originalrequest;
     /**
@@ -109,12 +109,38 @@ class eppResponse extends \DOMDocument {
         return false;
     }
 
+    #[\ReturnTypeWillChange]
     public function saveXML(\DOMNode $node = NULL, $options = NULL) {
         return str_replace("\t", '  ', parent::saveXML($node, LIBXML_NOEMPTYTAG));
     }
 
+    public function formatContents() {
+        $result = '';
+        $spacing = 2;
+        $text = $this->saveXML();
+        $text = str_replace("\n",'',$text);
+        $text = str_replace('><',">\n<",$text);
+        $text = str_replace(' <'," \n<",$text);
+        $output = explode("\n",$text);
+        $spaces = 0;
+        foreach ($output as $line) {
+            if (strpos($line,'</')===0) {
+                $spaces -= $spacing;
+            }
+            $result .= substr('                          ',0,$spaces).$line."\n";
+            $spaces += $spacing;
+            if (strpos($line,'?>')!==false) {
+                $spaces -= $spacing;
+            }
+            if (strpos($line,'</')!==false) {
+                $spaces -= $spacing;
+            }
+        }
+        return $result;
+    }
+
     public function dumpContents() {
-        echo $this->saveXML();
+        echo $this->formatContents();
     }
 
     /**
@@ -177,7 +203,7 @@ class eppResponse extends \DOMDocument {
                 $errorstring .= '; ' . $id;
             }
             $resultreason = $this->getResultReason();
-            if (strlen($resultreason)) {
+            if (is_string($resultreason) && strlen($resultreason)) {
                 $errorstring .= ' (' . $resultreason . ')';
             }
             if ((is_array($this->exceptions)) && (count($this->exceptions)>0)) {

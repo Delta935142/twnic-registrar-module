@@ -1,8 +1,8 @@
 {
-    "name": "delta935142/twnic-epp-client",
+    "name": "metaregistrar/php-epp-client",
     "type": "library",
     "description": "Object-oriented PHP EPP Client",
-    "keywords": ["xml","epp","domains","twnic"],
+    "keywords": ["xml","epp","domains"],
     "homepage": "https://github.com/metaregistrar/php-epp-client",
     "license": "MIT",
     "authors": [
@@ -12,7 +12,10 @@
         }
     ],
     "require": {
-        "php": "^7"
+        "php": "^7|^8.0",
+        "ext-dom": "*",
+        "ext-libxml": "*",
+        "ext-mbstring": "*"
     },
     "require-dev": {
         "phpunit/phpunit": "^7"

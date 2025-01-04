@@ -120,6 +120,11 @@ class eppConnection {
     protected $launchphase = null;
 
     /**
+     * @var resource
+     */
+    protected $sslContext = null;
+
+    /**
      * Path to certificate file
      * @var string
      */
@@ -148,6 +153,11 @@ class eppConnection {
      * @var boolean
      */
     protected $verify_peer_name = true;
+
+    /**
+     * @var bool Using stream_set_blocking true or false on connections
+     */
+    protected $blocking = false;
 
     protected $logentries = array();
 
@@ -336,31 +346,34 @@ class eppConnection {
         if ($port) {
             $this->port = $port;
         }
-        $context = stream_context_create();
-        stream_context_set_option($context, 'ssl','verify_peer', $this->verify_peer);
-        stream_context_set_option($context, 'ssl', 'verify_peer_name', $this->verify_peer_name);
-        if ($this->local_cert_path) {
-            stream_context_set_option($context, 'ssl', 'local_cert', $this->local_cert_path);
-            if (isset($this->local_cert_pwd) && (strlen($this->local_cert_pwd)>0)) {
-                stream_context_set_option($context, 'ssl', 'passphrase', $this->local_cert_pwd);
+        if (!$this->sslContext) {
+            $context = stream_context_create();
+            stream_context_set_option($context, 'ssl', 'verify_peer', $this->verify_peer);
+            stream_context_set_option($context, 'ssl', 'verify_peer_name', $this->verify_peer_name);
+            if ($this->local_cert_path) {
+                stream_context_set_option($context, 'ssl', 'local_cert', $this->local_cert_path);
+                if (isset($this->local_cert_pwd) && (strlen($this->local_cert_pwd)>0)) {
+                    stream_context_set_option($context, 'ssl', 'passphrase', $this->local_cert_pwd);
+                }
+                if (isset($this->allow_self_signed)) {
+                    stream_context_set_option($context, 'ssl', 'allow_self_signed', $this->allow_self_signed);
+                    stream_context_set_option($context, 'ssl', 'verify_peer', false);
+                } else {
+                    stream_context_set_option($context, 'ssl', 'verify_peer', $this->verify_peer);
+                }
             }
-            if (isset($this->allow_self_signed)) {
-                stream_context_set_option($context, 'ssl', 'allow_self_signed', $this->allow_self_signed);
-                stream_context_set_option($context, 'ssl', 'verify_peer', false);
-            } else {
-                stream_context_set_option($context, 'ssl', 'verify_peer', $this->verify_peer);
-            }
+            $this->sslContext = $context;
         }
-        $this->connection = stream_socket_client($this->hostname.':'.$this->port, $errno, $errstr, $this->timeout, STREAM_CLIENT_CONNECT, $context);
+        $this->connection = stream_socket_client($this->hostname.':'.$this->port, $errno, $errstr, $this->timeout, STREAM_CLIENT_CONNECT, $this->sslContext);
         if (is_resource($this->connection)) {
-            stream_set_blocking($this->connection, false);
+            stream_set_blocking($this->connection, $this->blocking);
             stream_set_timeout($this->connection, $this->timeout);
             if ($errno == 0) {
                 $meta = stream_get_meta_data($this->connection);
                 if (isset($meta['crypto'])) {
-                    $this->writeLog("Stream opened with protocol ".$meta['crypto']['protocol'].", cipher ".$meta['crypto']['cipher_name'].", ".$meta['crypto']['cipher_bits']." bits ".$meta['crypto']['cipher_version'],"Connection made");
+                    $this->writeLog("Stream opened to ".$this->getHostname()." port ".$this->getPort()." with protocol ".$meta['crypto']['protocol'].", cipher ".$meta['crypto']['cipher_name'].", ".$meta['crypto']['cipher_bits']." bits ".$meta['crypto']['cipher_version'],"Connection made");
                 } else {
-                    $this->writeLog("Stream opened","Connection made");
+                    $this->writeLog("Stream opened to ".$this->getHostname()." port ".$this->getPort(),"Connection made");
                 }
                 $this->connected = true;
                 $this->read();
@@ -399,13 +412,17 @@ class eppConnection {
      * @throws eppException
      */
     public function logout() {
-        $logout = new eppLogoutRequest();
-        if ($response = $this->request($logout)) {
-            $this->writeLog("Logged out","LOGOUT");
-            $this->loggedin = false;
-            return true;
+        if ($this->loggedin) {
+            $logout = new eppLogoutRequest();
+            if ($response = $this->request($logout)) {
+                $this->writeLog("Logged out","LOGOUT");
+                $this->loggedin = false;
+                return true;
+            } else {
+                throw new eppException("Logout failed: ".$response->getResultMessage(),0,null,null,$logout->saveXML());
+            }
         } else {
-            throw new eppException("Logout failed: ".$response->getResultMessage(),0,null,null,$logout->saveXML());
+            return true;
         }
     }
 
@@ -817,6 +834,7 @@ class eppConnection {
         if (!$response) {
             throw new eppException("No valid response from server",0,null,null,$content);
         }
+        $content->preserveWhiteSpace = false;
         $content->formatOutput = true;
         $this->writeLog($content->saveXML(null, LIBXML_NOEMPTYTAG),"WRITE");
 
@@ -836,7 +854,9 @@ class eppConnection {
                 set_error_handler(array($this,'HandleXmlError'));
                 if ($response->loadXML($xml)) {
                     restore_error_handler();
-                    $this->writeLog($response->saveXML(null, LIBXML_NOEMPTYTAG), "READ");
+                    $response->preserveWhiteSpace = false;
+                    $response->formatOutput = true;
+                    $this->writeLog($response->formatContents(), "READ");
                     $clienttransid = $response->getClientTransactionId();
                     if (($this->checktransactionids) && ($clienttransid) && ($clienttransid != $requestsessionid) && ($clienttransid!='{{clTRID}}')) {
                         throw new eppException("Client transaction id $requestsessionid does not match returned $clienttransid",0,null,null,$xml);
@@ -853,7 +873,6 @@ class eppConnection {
                     restore_error_handler();
                 }
             } else {
-
                 throw new eppException('Empty XML document when receiving data!');
             }
         } else {
@@ -940,6 +959,14 @@ class eppConnection {
         $this->port = $port;
     }
 
+    public function getSslContext() {
+        return $this->sslContext;
+    }
+
+    public function setSslContext($sslContext) {
+        $this->sslContext = $sslContext;
+    }
+
     public function setVerifyPeer($verify_peer) {
         $this->verify_peer = $verify_peer;
     }
@@ -965,8 +992,12 @@ class eppConnection {
         $this->retry = $retry;
     }
 
-    public function addDefaultNamespace($xmlns, $namespace) {
-        $this->defaultnamespace[$namespace] = 'xmlns:' . $xmlns;
+    public function addDefaultNamespace($xmlns, $namespace, $addxmlns=true) {
+        if ($addxmlns) {
+            $this->defaultnamespace[$namespace] = 'xmlns:' . $xmlns;
+        } else {
+            $this->defaultnamespace[$namespace] = $xmlns;
+        }
     }
 
     public function getDefaultNamespaces() {
@@ -983,6 +1014,14 @@ class eppConnection {
 
     public function setLanguage($language) {
         $this->language = $language;
+    }
+
+    public function setBlocking($blocking) {
+        $this->blocking = $blocking;
+    }
+
+    public function getBlocking() {
+        return $this->blocking;
     }
 
     public function getResponses() {
@@ -1079,7 +1118,6 @@ class eppConnection {
      * Enables logging
      */
     private function enableLogging() {
-        date_default_timezone_set("Europe/Amsterdam");
         $this->logging = true;
     }
 
@@ -1150,7 +1188,7 @@ class eppConnection {
      * @return array
      * @throws eppException
      */
-    static function loadSettings($directory = null, $settingsfile) {
+    static function loadSettings($directory, $settingsfile) {
         if ($directory) {
             $path = $directory . '/' . $settingsfile;
         } else {

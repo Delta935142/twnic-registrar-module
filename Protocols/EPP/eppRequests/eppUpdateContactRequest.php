@@ -2,10 +2,10 @@
 namespace Metaregistrar\EPP;
 
 class eppUpdateContactRequest extends eppContactRequest {
-    function __construct($objectname, $addinfo = null, $removeinfo = null, $updateinfo = null, $namespacesinroot = true) {
+    function __construct($objectname, $addinfo = null, $removeinfo = null, $updateinfo = null, $namespacesinroot = true, $usecdata = true) {
         $this->setNamespacesinroot($namespacesinroot);
         parent::__construct(eppRequest::TYPE_UPDATE);
-
+        $this->setUseCdata($usecdata);
         if ($objectname instanceof eppContactHandle) {
             $contacthandle = $objectname->getContactHandle();
         } else {
@@ -36,7 +36,6 @@ class eppUpdateContactRequest extends eppContactRequest {
         # Object create structure
         #
         $this->contactobject->appendChild($this->createElement('contact:id', $contactid));
-        $this->setUpdateInfo($updateInfo);
         if ($updateInfo instanceof eppContact) {
             $chgcmd = $this->createElement('contact:chg');
             $this->addContactChanges($chgcmd, $updateInfo);
@@ -87,52 +86,50 @@ class eppUpdateContactRequest extends eppContactRequest {
     private function addContactChanges($element, eppContact $contact) {
 
         if ($contact->getPostalInfoLength() > 0) {
-            for ($a = 0; $a < $contact->getPostalInfoLength(); $a++) {
-                $postal = $contact->getPostalInfo($a);
-                $postalinfo = $this->createElement('contact:postalInfo');
-                if ($postal->getType()==eppContact::TYPE_AUTO) {
-                    // If all fields are ascii, type = int (international) else type = loc (localization)
-                    if ((self::isAscii($postal->getName())) && (self::isAscii($postal->getOrganisationName())) && (self::isAscii($postal->getStreet(0)))) {
-                        $postal->setType(eppContact::TYPE_INT);
-                    } else {
-                        $postal->setType(eppContact::TYPE_LOC);
-                    }
+            $postal = $contact->getPostalInfo(0);
+            $postalinfo = $this->createElement('contact:postalInfo');
+            if ($postal->getType()==eppContact::TYPE_AUTO) {
+                // If all fields are ascii, type = int (international) else type = loc (localization)
+                if ((self::isAscii($postal->getName())) && (self::isAscii($postal->getOrganisationName())) && (self::isAscii($postal->getStreet(0)))) {
+                    $postal->setType(eppContact::TYPE_INT);
+                } else {
+                    $postal->setType(eppContact::TYPE_LOC);
                 }
-                $postalinfo->setAttribute('type', $postal->getType());
-                // Mandatory field
-                if (strlen($postal->getName())>0) {
-                    $postalinfo->appendChild($this->createElement('contact:name', $postal->getName()));
-                }
-                // Optional field
-                if (!is_null($postal->getOrganisationName())) {
-                    $postalinfo->appendChild($this->createElement('contact:org', $postal->getOrganisationName()));
-                }
-                if ((($postal->getStreetCount()) > 0) || strlen($postal->getCity()) || strlen($postal->getProvince()) || strlen($postal->getZipcode()) || strlen($postal->getCountrycode())) {
-                    $postaladdr = $this->createElement('contact:addr');
-                    if (($count = $postal->getStreetCount()) > 0) {
-                        for ($i = 0; $i < $count; $i++) {
-                            $postaladdr->appendChild($this->createElement('contact:street', $postal->getStreet($i)));
-                        }
-                    }
-                    if (strlen($postal->getCity())) {
-                        $postaladdr->appendChild($this->createElement('contact:city', $postal->getCity()));
-                    }
-                    if (strlen($postal->getProvince())) {
-                        $postaladdr->appendChild($this->createElement('contact:sp', $postal->getProvince()));
-                    }
-                    if (strlen($postal->getZipcode())) {
-                        $postaladdr->appendChild($this->createElement('contact:pc', $postal->getZipcode()));
-                    }
-                    if (strlen($postal->getCountrycode())) {
-                        $postaladdr->appendChild($this->createElement('contact:cc', $postal->getCountrycode()));
-                    }
-                    $postalinfo->appendChild($postaladdr);
-                }
-                $element->appendChild($postalinfo);
             }
+            $postalinfo->setAttribute('type', $postal->getType());
+            // Mandatory field
+            if (is_string($postal->getName()) && strlen($postal->getName()) > 0) {
+                $postalinfo->appendChild($this->createElement('contact:name', $postal->getName()));
+            }
+            // Optional field
+            if (!is_null($postal->getOrganisationName())) {
+                $postalinfo->appendChild($this->createElement('contact:org', $postal->getOrganisationName()));
+            }
+            if ((($postal->getStreetCount()) > 0) || strlen($postal->getCity()) || strlen($postal->getProvince()) || strlen($postal->getZipcode()) || strlen($postal->getCountrycode())) {
+                $postaladdr = $this->createElement('contact:addr');
+                if (($count = $postal->getStreetCount()) > 0) {
+                    for ($i = 0; $i < $count; $i++) {
+                        $postaladdr->appendChild($this->createElement('contact:street', $postal->getStreet($i)));
+                    }
+                }
+                if (strlen($postal->getCity())) {
+                    $postaladdr->appendChild($this->createElement('contact:city', $postal->getCity()));
+                }
+                if (is_string($postal->getProvince()) && strlen($postal->getProvince())) {
+                    $postaladdr->appendChild($this->createElement('contact:sp', $postal->getProvince()));
+                }
+                if (strlen($postal->getZipcode())) {
+                    $postaladdr->appendChild($this->createElement('contact:pc', $postal->getZipcode()));
+                }
+                if (strlen($postal->getCountrycode())) {
+                    $postaladdr->appendChild($this->createElement('contact:cc', $postal->getCountrycode()));
+                }
+                $postalinfo->appendChild($postaladdr);
+            }
+            $element->appendChild($postalinfo);
         }
         // Mandatory field
-        if (strlen($contact->getVoice())) {
+        if (is_string($contact->getVoice()) && strlen($contact->getVoice())) {
             $element->appendChild($this->createElement('contact:voice', $contact->getVoice()));
         }
         // Optional field, may be empty
@@ -140,13 +137,18 @@ class eppUpdateContactRequest extends eppContactRequest {
             $element->appendChild($this->createElement('contact:fax', $contact->getFax()));
         }
         // Mandatory field
-        if (strlen($contact->getEmail())) {
+        if (is_string($contact->getEmail()) && strlen($contact->getEmail())) {
             $element->appendChild($this->createElement('contact:email', $contact->getEmail()));
         }
         // Optional field, may be empty
         if (!is_null($contact->getPassword())) {
             $authinfo = $this->createElement('contact:authInfo');
-            $authinfo->appendChild($this->createElement('contact:pw', $contact->getPassword()));
+            if ($this->useCdata()) {
+                $pw = $authinfo->appendChild($this->createElement('contact:pw'));
+                $pw->appendChild($this->createCDATASection($contact->getPassword()));
+            } else {
+                $authinfo->appendChild($this->createElement('contact:pw', $contact->getPassword()));
+            }
             $element->appendChild($authinfo);
         }
         // Optional field, may be empty
@@ -194,4 +196,6 @@ class eppUpdateContactRequest extends eppContactRequest {
             $this->contactobject->appendChild($extension);
         }
     }
+
+
 }
